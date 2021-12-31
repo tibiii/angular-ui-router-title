@@ -8,53 +8,51 @@
  * License MIT
  */
 
-(function(angular) {
-
-"use strict";
-var documentTitleCallback = undefined;
-var defaultDocumentTitle = document.title;
-angular.module("ui.router.title", ["ui.router"])
-    .provider("$title", function $titleProvider() {
-    return {
-        documentTitle: function (cb) {
-            documentTitleCallback = cb;
-        },
-        $get: ["$state", function ($state) {
-                return {
-                    title: function () { return getTitleValue($state.$current.locals.globals["$title"]); },
-                    breadCrumbs: function () {
-                        var $breadcrumbs = [];
-                        var state = $state.$current;
-                        while (state) {
-                            if (state["resolve"] && state["resolve"].$title) {
-                                $breadcrumbs.unshift({
-                                    title: getTitleValue(state.locals.globals["$title"]),
-                                    state: state["self"].name,
-                                    stateParams: state.locals.globals["$stateParams"]
+(function (angular) {
+    "use strict";
+    var documentTitleCallback = undefined;
+    var defaultDocumentTitle = document.title;
+    angular.module("ui.router.title", ["ui.router"])
+        .provider("$title", function $titleProvider() {
+            return {
+                documentTitle: function (cb) {
+                    documentTitleCallback = cb;
+                },
+                $get: ["$state", function ($state) {
+                    return {
+                        breadCrumbs: function (trans) {
+                            var $breadcrumbs = [];
+                            var state = $state.$current;
+                            while (state && state['navigable']) {
+                                var hasTitle = state['resolvables'].some(function (s) {
+                                    return s.token === '$title';
                                 });
+                                $breadcrumbs.unshift({
+                                    title: hasTitle ? trans.injector(state).get('$title') : state['self'].title,
+                                    state: state['name'],
+                                    stateParams: state['params']
+                                });
+                                state = state["parent"];
                             }
-                            state = state["parent"];
+                            return $breadcrumbs;
                         }
-                        return $breadcrumbs;
-                    }
-                };
-            }]
-    };
-})
-    .run(["$rootScope", "$timeout", "$title", "$injector", function ($rootScope, $timeout, $title, $injector) {
-        $rootScope.$on("$stateChangeSuccess", function () {
-            var title = $title.title();
-            $timeout(function () {
-                $rootScope.$title = title;
-                var documentTitle = documentTitleCallback ? $injector.invoke(documentTitleCallback) : title || defaultDocumentTitle;
-                document.title = documentTitle;
+                    };
+                }]
+            };
+        })
+        .run(["$rootScope", "$timeout", "$title", "$transitions", function ($rootScope, $timeout, $title, $transitions) {
+            $transitions.onSuccess({}, function (trans) {
+                var title = getTitleValue(trans.injector().get('$title'));
+                $timeout(function () {
+                    $rootScope.$title = title;
+                    var documentTitle = documentTitleCallback ? trans.injector().native.invoke(documentTitleCallback) : title || defaultDocumentTitle;
+                    document.title = documentTitle;
+                });
+                $rootScope.$breadcrumbs = $title.breadCrumbs(trans);
             });
-            $rootScope.$breadcrumbs = $title.breadCrumbs();
-        });
-    }]);
-function getTitleValue(title) {
-    return angular.isFunction(title) ? title() : title;
-}
+        }]);
 
-
+    function getTitleValue(title) {
+        return angular.isFunction(title) ? title() : title;
+    }
 })(window.angular);

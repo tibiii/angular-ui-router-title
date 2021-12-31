@@ -2,7 +2,7 @@ import angular = require("angular");
 
 declare module "angular" {
 	interface IRootScopeService {
-		$title?: string;
+		$title: string;
 		$breadcrumbs: {
 			title: string;
 			state: string;
@@ -12,8 +12,7 @@ declare module "angular" {
 
 	namespace ui {
 		interface ITitleService {
-			title: () => string;
-			breadCrumbs: () => {
+			breadCrumbs: (trans) => {
 				title: string;
 				state: string;
 				stateParams: { ["key"]: any }

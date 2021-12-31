@@ -11,18 +11,18 @@ angular.module("ui.router.title", ["ui.router"])
 			},
 			$get: ["$state", ($state: ng.ui.IStateService): ng.ui.ITitleService => {
 				return {
-					title: () => getTitleValue($state.$current.locals.globals["$title"]),
-					breadCrumbs: () => {
+					breadCrumbs: (trans) => {
 						let $breadcrumbs = [];
 						var state = $state.$current;
-						while (state) {
-							if (state["resolve"] && state["resolve"].$title) {
-								$breadcrumbs.unshift({
-									title: getTitleValue(state.locals.globals["$title"]) as string,
-									state: state["self"].name,
-									stateParams: state.locals.globals["$stateParams"]
-								});
-							}
+						while (state && state['navigable']) {
+							var hasTitle = state['resolvables'].some(s => s.token === '$title');
+
+							$breadcrumbs.unshift({
+								title: hasTitle ? trans.injector(state).get('$title') : state['self'].title,
+								state: state['name'],
+								stateParams: state['params']
+							});
+
 							state = state["parent"];
 						}
 						return $breadcrumbs;
@@ -31,24 +31,23 @@ angular.module("ui.router.title", ["ui.router"])
 			}]
 		};
 	})
-	.run(["$rootScope", "$timeout", "$title", "$injector", function(
+	.run(["$rootScope", "$timeout", "$title", "$transitions", function(
 		$rootScope: ng.IRootScopeService,
 		$timeout: ng.ITimeoutService,
 		$title: ng.ui.ITitleService,
-		$injector
+		$transitions
 	) {
 
-		$rootScope.$on("$stateChangeSuccess", function() {
-			var title = $title.title();
-			$timeout(function() {
+		$transitions.onSuccess({}, function (trans) {
+			var title = getTitleValue(trans.injector().get('$title'));
+			$timeout(function () {
 				$rootScope.$title = title;
-				const documentTitle = documentTitleCallback ? $injector.invoke(documentTitleCallback) : title || defaultDocumentTitle;
+				const documentTitle = documentTitleCallback ? trans.injector().native.invoke(documentTitleCallback) : title || defaultDocumentTitle;
 				document.title = documentTitle;
 			});
 
-			$rootScope.$breadcrumbs = $title.breadCrumbs();
+			$rootScope.$breadcrumbs = $title.breadCrumbs(trans);
 		});
-
 	}]);
 
 function getTitleValue(title) {
